@@ -5,23 +5,28 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Building2, Users, Target, BarChart3, Mail, LogOut, Menu, X } from "lucide-react";
 
+import { useAnalyticsSummary } from "@/lib/hooks/use-analytics";
+
 export default function CompanyDashboardPage() {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading, logout } = useAuth();
   const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const summary = useAnalyticsSummary();
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!authLoading && !isAuthenticated) {
       router.push("/login");
     }
-  }, [isAuthenticated, router]);
+  }, [authLoading, isAuthenticated, router]);
 
-  if (!user) return null;
+  if (authLoading || !user) return null;
 
   const handleLogout = () => {
     logout();
     router.push("/login");
   };
+
+  const data = summary.data;
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -40,9 +45,6 @@ export default function CompanyDashboardPage() {
           {/* Desktop User Menu */}
           <div className="hidden items-center gap-4 md:flex">
             <span className="text-sm text-gray-600">{user.email}</span>
-            <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-700">
-              {user.roleName}
-            </span>
             <button
               onClick={handleLogout}
               className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-gray-600 transition hover:bg-gray-100"
@@ -64,19 +66,13 @@ export default function CompanyDashboardPage() {
         {/* Mobile Menu Dropdown */}
         {isMobileMenuOpen && (
           <div className="border-t border-gray-100 bg-gray-50 px-6 py-4 md:hidden">
-            <div className="flex flex-col gap-3">
-              <span className="text-sm font-medium text-gray-900">{user.email}</span>
-              <span className="w-fit rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-700">
-                {user.roleName}
-              </span>
-              <button
-                onClick={handleLogout}
-                className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
-              >
-                <LogOut className="h-4 w-4" />
-                Logout
-              </button>
-            </div>
+            <button
+              onClick={handleLogout}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+            >
+              <LogOut className="h-4 w-4" />
+              Logout
+            </button>
           </div>
         )}
       </header>
@@ -92,34 +88,26 @@ export default function CompanyDashboardPage() {
           <DashCard
             icon={<Target className="h-6 w-6 text-orange-600" />}
             title="Campaigns"
-            description="Create and manage phishing simulation campaigns."
-            stat="—"
+            description="Active campaigns running."
+            stat={data ? (data.eventsByCategory['campaign']?.toString() || "0") : "—"}
             statLabel="Active campaigns"
             color="orange"
           />
           <DashCard
             icon={<Users className="h-6 w-6 text-blue-600" />}
-            title="Team Members"
-            description="Invite employees and manage team access."
-            stat="—"
-            statLabel="Team members"
+            title="Active Users"
+            description="Users engaged in the platform."
+            stat={data ? data.activeUsers.toString() : "—"}
+            statLabel="Active users"
             color="blue"
           />
           <DashCard
             icon={<Mail className="h-6 w-6 text-green-600" />}
-            title="Scenarios"
-            description="Browse and assign phishing scenarios."
-            stat="—"
-            statLabel="Available scenarios"
+            title="New Registrations"
+            description="Recently joined team members."
+            stat={data ? data.newRegistrations.toString() : "—"}
+            statLabel="New registrations"
             color="green"
-          />
-          <DashCard
-            icon={<BarChart3 className="h-6 w-6 text-purple-600" />}
-            title="Reports"
-            description="View organization-wide training results."
-            stat="—"
-            statLabel="Completion rate"
-            color="purple"
           />
         </div>
       </div>

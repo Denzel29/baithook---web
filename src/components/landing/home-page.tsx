@@ -5,6 +5,7 @@ import { UserType } from "@/types/shared";
 import { HorizontalNav } from "../nav-bar/hor-nav";
 import { HeroSection } from "./hero-section";
 import { VideoShowcase } from "../video-showcase";
+import { SiteFooter } from "../site-footer";
 
 export const HomePage = () => {
   const [userType, setUserType] = useState<UserType>(UserType.Individual);
@@ -29,6 +30,7 @@ export const HomePage = () => {
           videoSrc="https://www.youtube.com/watch?v=0JAumWkTruE&list=RD0JAumWkTruE&start_radio=1&pp=oAcB"
         />
       </section>
+      <SiteFooter />
     </>
   );
 };

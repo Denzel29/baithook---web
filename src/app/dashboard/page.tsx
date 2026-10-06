@@ -6,17 +6,17 @@ import { useEffect, useState } from "react";
 import { Target, BookOpen, BarChart3, Play, LogOut, Menu, X } from "lucide-react";
 
 export default function UserDashboardPage() {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, isLoading, logout } = useAuth();
   const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isLoading && !isAuthenticated) {
       router.push("/login");
     }
-  }, [isAuthenticated, router]);
+  }, [isLoading, isAuthenticated, router]);
 
-  if (!user) return null;
+  if (isLoading || !user) return null;
 
   const handleLogout = () => {
     logout();
@@ -40,9 +40,6 @@ export default function UserDashboardPage() {
           {/* Desktop User Menu */}
           <div className="hidden items-center gap-4 md:flex">
             <span className="text-sm text-gray-600">{user.email}</span>
-            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
-              {user.roleName ?? "User"}
-            </span>
             <button
               onClick={handleLogout}
               className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-gray-600 transition hover:bg-gray-100"
@@ -64,19 +61,13 @@ export default function UserDashboardPage() {
         {/* Mobile Menu Dropdown */}
         {isMobileMenuOpen && (
           <div className="border-t border-gray-100 bg-gray-50 px-6 py-4 md:hidden">
-            <div className="flex flex-col gap-3">
-              <span className="text-sm font-medium text-gray-900">{user.email}</span>
-              <span className="w-fit rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
-                {user.roleName ?? "User"}
-              </span>
-              <button
-                onClick={handleLogout}
-                className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
-              >
-                <LogOut className="h-4 w-4" />
-                Logout
-              </button>
-            </div>
+            <button
+              onClick={handleLogout}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+            >
+              <LogOut className="h-4 w-4" />
+              Logout
+            </button>
           </div>
         )}
       </header>

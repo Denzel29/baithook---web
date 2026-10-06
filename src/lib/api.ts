@@ -8,6 +8,20 @@ interface RequestOptions {
 	token?: string;
 }
 
+// Carries the server's per-field validation errors so forms can show them
+// next to the right input. Still an Error, so existing callers that only
+// read .message keep working.
+export class ApiError extends Error {
+	constructor(
+		message: string,
+		public readonly status: number,
+		public readonly fieldErrors: { field?: string; message: string }[] = []
+	) {
+		super(message);
+		this.name = 'ApiError';
+	}
+}
+
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
 	const res = await fetch(`${API_BASE_URL}${path}`, {
 		method: options.method ?? 'GET',
@@ -21,7 +35,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 	const json: ApiResponse<T> = await res.json();
 
 	if (!res.ok || !json.success) {
-		throw new Error(json.message || 'Request failed');
+		throw new ApiError(json.message || 'Request failed', res.status, json.errors ?? []);
 	}
 
 	return json.data as T;

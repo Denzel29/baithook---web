@@ -14,10 +14,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className="bg-bue-500 h-screen w-full"
+        className="h-screen w-full min-w-[320px] bg-white antialiased"
         suppressHydrationWarning={true}
       >
-        <main className="bg-=500 h-full w-full">
+        <main className="h-full w-full">
           <Toaster position="top-center" duration={5000} richColors />
           <Providers>{children}</Providers>
         </main>

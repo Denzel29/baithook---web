@@ -48,7 +48,7 @@ export const HorizontalNav = ({
               onClick={() => onProfileChange(UserType.Organization)}
               className={`cursor-pointer rounded-xl px-4 py-2 font-medium transition-all duration-200 ${
                 activeProfile === UserType.Organization
-                  ? "bg-orange-500 text-white hover:bg-orange-600/90"
+                  ? "bg-[#435d89] text-white hover:bg-[#435d89]/90"
                   : "border border-gray-200 bg-gray-100 text-gray-700 hover:border-gray-300 hover:bg-gray-200 hover:text-gray-900"
               }`}
             >
@@ -103,7 +103,7 @@ export const HorizontalNav = ({
                     : "border border-gray-200 bg-gray-100 text-gray-700 hover:border-gray-300 hover:bg-gray-200 hover:text-gray-900"
                 }`}
               >
-                For Recruiters
+                Login
               </button>
               <button
                 onClick={() => {
@@ -112,11 +112,11 @@ export const HorizontalNav = ({
                 }}
                 className={`block w-full cursor-pointer rounded-lg px-6 py-2 text-center font-medium transition-colors duration-200 ${
                   activeProfile === UserType.Organization
-                    ? "bg-orange-500 text-white"
+                    ? "bg-[#435d89] text-white"
                     : "border border-gray-200 bg-gray-100 text-gray-700 hover:border-gray-300 hover:bg-gray-200 hover:text-gray-900"
                 }`}
               >
-                For Job Seekers
+                Organizations
               </button>
             </div>
           </div>

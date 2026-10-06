@@ -1,5 +1,6 @@
 import { UserType } from "@/types/shared";
 import { LoginForm } from "./login-form";
+import { CompanyRequestForm } from "../onboarding/company-request-form";
 
 interface AuthPageProps {
   profile: UserType;
@@ -13,7 +14,7 @@ function AuthPage({ profile }: AuthPageProps) {
           <LoginForm />
         </div>
       ) : (
-        <div>Company Demo login page goes here</div>
+        <CompanyRequestForm />
       )}
     </section>
   );
