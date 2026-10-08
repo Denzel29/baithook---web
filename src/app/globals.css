@@ -142,3 +142,36 @@ body,
 		@apply bg-background text-foreground;
 	}
 }
+
+
+/* Modal entrance: the backdrop fades in while the panel rises and settles */
+@keyframes dialog-fade {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes dialog-pop {
+	from {
+		opacity: 0;
+		transform: translateY(14px) scale(0.96);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	@keyframes dialog-pop {
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
+	}
+}

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { AlertCircle, ArrowLeft, CheckCircle2, Loader2, Lock, Pencil, Plus, Rocket, Search, SearchX, Archive, Trash2, Megaphone } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, Loader2, Lock, Pencil, Plus, Rocket, Search, SearchX, Archive, Trash2, Megaphone, Users } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -34,7 +34,12 @@ import {
   type Campaign,
   type CampaignStatus,
 } from "@/types/campaigns";
+import { AssignDialog } from "@/components/training/assign-dialog";
+import { AssignmentsTab } from "@/components/training/assignments-tab";
+import { useCatalog, usePublishCampaign } from "@/lib/hooks/use-training";
+import { LEARNER_DIFFICULTY_LABELS } from "@/types/training";
 import { CampaignForm } from "./campaign-form";
+import { GenerationBanner, GenerationCard } from "./generation";
 import { EmailsTab } from "./emails-tab";
 import { MaterialsTab } from "./materials-tab";
 import { PagesTab } from "./pages-tab";
@@ -45,14 +50,18 @@ const statusBadge = (c: Pick<Campaign, "status">) => <StatusBadge status={c.stat
 
 // Shared by the company and platform dashboards: the same authoring tools, the
 // server decides whose campaigns each admin sees.
-export function CampaignsView({ basePath }: { basePath: string }) {
+// "company" admins assign what they launch (and the platform's published campaigns);
+// "platform" admins publish theirs to the catalog.
+export type WorkspaceMode = "company" | "platform";
+
+export function CampaignsView({ basePath, mode }: { basePath: string; mode: WorkspaceMode }) {
   const selectedId = useSearchParams().get("id");
-  return selectedId ? <CampaignDetail id={selectedId} basePath={basePath} /> : <CampaignList basePath={basePath} />;
+  return selectedId ? <CampaignDetail id={selectedId} basePath={basePath} mode={mode} /> : <CampaignList basePath={basePath} mode={mode} />;
 }
 
 // ── List ─────────────────────────────────────────────────────────────────────
 
-function CampaignList({ basePath }: { basePath: string }) {
+function CampaignList({ basePath, mode }: { basePath: string; mode: WorkspaceMode }) {
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
@@ -138,7 +147,9 @@ function CampaignList({ basePath }: { basePath: string }) {
         )}
       </Panel>
 
-      <Dialog open={creating} onClose={() => setCreating(false)} title="New campaign" description="Describe what the campaign should cover. You can write the emails by hand now." wide>
+      {mode === "company" && <PlatformCatalogPanel />}
+
+      <Dialog open={creating} onClose={() => setCreating(false)} title="New campaign" icon={<Megaphone />} description="Describe what the campaign should cover. You can write the emails by hand now." wide="xl">
         <CampaignForm
           submitLabel="Create campaign"
           pending={create.isPending}
@@ -159,12 +170,44 @@ function CampaignList({ basePath }: { basePath: string }) {
   );
 }
 
+// Platform campaigns published to the catalog, ready for a company to assign
+function PlatformCatalogPanel() {
+  const catalog = useCatalog();
+  const [assigning, setAssigning] = useState<{ id: string; name: string } | null>(null);
+  const list = catalog.data ?? [];
+  if (catalog.isLoading || list.length === 0) return null;
+
+  return (
+    <Panel title="From the platform" description="Ready-made campaigns you can assign to your people without writing anything.">
+      <ul className="divide-y divide-gray-100">
+        {list.map((c) => (
+          <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+            <div className="min-w-0">
+              <p className="font-semibold text-gray-900">
+                {c.name}{" "}
+                <span className="text-sm font-normal text-gray-400">
+                  · {LEARNER_DIFFICULTY_LABELS[c.difficulty]} · {c.emails} emails
+                </span>
+              </p>
+              {c.summary && <p className="truncate text-sm text-gray-500">{c.summary}</p>}
+            </div>
+            <button className={secondaryButton} onClick={() => setAssigning({ id: c.id, name: c.name })}>
+              Assign
+            </button>
+          </li>
+        ))}
+      </ul>
+      {assigning && <AssignDialog campaignId={assigning.id} campaignName={assigning.name} open onClose={() => setAssigning(null)} />}
+    </Panel>
+  );
+}
+
 // ── Detail ───────────────────────────────────────────────────────────────────
 
-const TABS = ["overview", "emails", "pages", "materials"] as const;
+const TABS = ["overview", "emails", "pages", "materials", "assignments"] as const;
 type Tab = (typeof TABS)[number];
 
-function CampaignDetail({ id, basePath }: { id: string; basePath: string }) {
+function CampaignDetail({ id, basePath, mode }: { id: string; basePath: string; mode: WorkspaceMode }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -207,7 +250,9 @@ function CampaignDetail({ id, basePath }: { id: string; basePath: string }) {
         </div>
       </div>
 
-      {!editable && (
+      <GenerationBanner campaign={c} />
+
+      {!editable && c.status !== "generating" && (
         <div className="flex items-start gap-3 rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 text-sm text-indigo-900">
           <Lock className="mt-0.5 h-4 w-4 shrink-0 text-[#2016a9]" />
           <p>
@@ -224,23 +269,27 @@ function CampaignDetail({ id, basePath }: { id: string; basePath: string }) {
           { href: href("emails"), label: "Emails", active: tab === "emails", count: c.counts.emails.total },
           { href: href("pages"), label: "Pages", active: tab === "pages", count: c.counts.pages.total },
           { href: href("materials"), label: "Materials", active: tab === "materials", count: c.counts.materials.total },
+          ...(mode === "company" ? [{ href: href("assignments"), label: "Assignments", active: tab === "assignments" }] : []),
         ]}
       />
 
-      {tab === "overview" && <Overview campaign={c} editable={editable} onDeleted={() => router.push(basePath)} />}
+      {tab === "overview" && <Overview campaign={c} editable={editable} mode={mode} onDeleted={() => router.push(basePath)} />}
       {tab === "emails" && <EmailsTab campaign={c} editable={editable} />}
       {tab === "pages" && <PagesTab campaign={c} editable={editable} />}
       {tab === "materials" && <MaterialsTab campaign={c} editable={editable} />}
+      {tab === "assignments" && mode === "company" && <AssignmentsTab campaign={c} canAssign />}
     </div>
   );
 }
 
-function Overview({ campaign: c, editable, onDeleted }: { campaign: Campaign; editable: boolean; onDeleted: () => void }) {
+function Overview({ campaign: c, editable, mode, onDeleted }: { campaign: Campaign; editable: boolean; mode: WorkspaceMode; onDeleted: () => void }) {
   const indicators = useIndicators();
   const readiness = useReadiness(c.id);
   const update = useUpdateCampaign(c.id);
   const act = useCampaignAction(c.id);
   const del = useDeleteCampaign();
+  const publish = usePublishCampaign(c.id);
+  const [assigning, setAssigning] = useState(false);
   const [editing, setEditing] = useState(false);
   const [confirm, setConfirm] = useState<"launch" | "archive" | "delete" | null>(null);
 
@@ -300,6 +349,8 @@ function Overview({ campaign: c, editable, onDeleted }: { campaign: Campaign; ed
             </div>
           </dl>
         </Panel>
+
+        {editable && <GenerationCard campaign={c} />}
       </div>
 
       <div className="space-y-6">
@@ -334,10 +385,39 @@ function Overview({ campaign: c, editable, onDeleted }: { campaign: Campaign; ed
         ) : (
           c.status === "active" && (
             <Panel title="Live">
-              <p className="text-sm text-gray-600">Archiving stops new attempts. Anyone midway can still finish.</p>
-              <button className={`${secondaryButton} mt-4 w-full`} onClick={() => setConfirm("archive")}>
+              {mode === "company" && (
+                <>
+                  <p className="text-sm text-gray-600">Give this campaign to your people.</p>
+                  <button className={`${primaryButton} mt-3 w-full`} onClick={() => setAssigning(true)}>
+                    <Users className="h-4 w-4" /> Assign
+                  </button>
+                </>
+              )}
+              {mode === "platform" && (
+                <>
+                  <p className="text-sm text-gray-600">
+                    {c.publishedToCatalog ? "Published. Individuals can enroll and companies can assign it." : "Not published yet. Publish it to the catalog so people can find it."}
+                  </p>
+                  <button
+                    className={`${c.publishedToCatalog ? secondaryButton : primaryButton} mt-3 w-full`}
+                    disabled={publish.isPending}
+                    onClick={() =>
+                      publish.mutate(!c.publishedToCatalog, {
+                        onSuccess: () => toast.success(c.publishedToCatalog ? "Removed from the catalog" : "Published to the catalog"),
+                        onError: (e) => toast.error(e.message),
+                      })
+                    }
+                  >
+                    {publish.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Megaphone className="h-4 w-4" />}
+                    {c.publishedToCatalog ? "Unpublish" : "Publish to catalog"}
+                  </button>
+                </>
+              )}
+              <p className="mt-5 border-t border-gray-100 pt-4 text-sm text-gray-600">Archiving stops new attempts. Anyone midway can still finish.</p>
+              <button className={`${secondaryButton} mt-3 w-full`} onClick={() => setConfirm("archive")}>
                 <Archive className="h-4 w-4" /> Archive campaign
               </button>
+              <AssignDialog campaignId={c.id} campaignName={c.name} open={assigning} onClose={() => setAssigning(false)} />
             </Panel>
           )
         )}
@@ -358,7 +438,7 @@ function Overview({ campaign: c, editable, onDeleted }: { campaign: Campaign; ed
         </Panel>
       </div>
 
-      <Dialog open={editing} onClose={() => setEditing(false)} title="Edit campaign" wide>
+      <Dialog open={editing} onClose={() => setEditing(false)} title="Edit campaign" icon={<Pencil />} wide="xl">
         <CampaignForm
           campaign={c}
           submitLabel="Save changes"
@@ -379,6 +459,7 @@ function Overview({ campaign: c, editable, onDeleted }: { campaign: Campaign; ed
       <Dialog
         open={confirm !== null}
         onClose={() => setConfirm(null)}
+        icon={confirm === "launch" ? <Rocket /> : confirm === "archive" ? <Archive /> : <Trash2 />}
         title={confirm === "launch" ? "Launch this campaign?" : confirm === "archive" ? "Archive this campaign?" : "Delete this draft?"}
       >
         <p className="text-sm text-gray-600">

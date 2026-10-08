@@ -16,6 +16,7 @@ import {
 const DEFAULTS: CampaignInput = {
   name: "",
   description: "",
+  learnerSummary: "",
   difficulty: "moderate",
   focusIndicators: [],
   templateCategories: [],
@@ -26,6 +27,7 @@ const DEFAULTS: CampaignInput = {
   maxAttempts: null,
   allowSpoofImperfections: false,
   tailorToAudience: false,
+  personalizeGreetings: true,
 };
 
 const chip = (on: boolean) =>
@@ -83,6 +85,21 @@ export function CampaignForm({
           maxLength={4000}
           placeholder="Describe the situations these emails should cover. Every email and page is written from this brief, so be specific about who the learners are and what kinds of requests they would plausibly get."
         />
+      </div>
+
+      <div>
+        <label className={labelClass} htmlFor="c-summary">
+          What learners see about it
+        </label>
+        <input
+          id="c-summary"
+          className={inputClass}
+          value={values.learnerSummary}
+          onChange={(e) => set("learnerSummary", e.target.value)}
+          maxLength={400}
+          placeholder="e.g. Practise spotting payroll and delivery scams."
+        />
+        <p className="mt-1 text-xs text-gray-500">Shown in the catalog and the briefing. Keep it free of hints, since the brief above is for you and is never shown to learners.</p>
       </div>
 
       <div>
@@ -162,6 +179,17 @@ export function CampaignForm({
           </label>
         )}
       </div>
+
+      <label className="flex items-start gap-3 rounded-2xl border border-gray-200 p-4 text-sm text-gray-700">
+        <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#2016a9]" checked={values.personalizeGreetings} onChange={(e) => set("personalizeGreetings", e.target.checked)} />
+        <span>
+          <span className="font-medium text-gray-900">Greet each learner by name</span>
+          <span className="mt-0.5 block text-gray-500">
+            AI-written emails open with the learner&apos;s own first name (&ldquo;Hi Ezra,&rdquo;) instead of a bare &ldquo;Hi,&rdquo;. It makes them more convincing. You can use merge fields like{" "}
+            <code className="rounded bg-gray-100 px-1">{"{{firstName}}"}</code> in emails you write yourself.
+          </span>
+        </span>
+      </label>
 
       <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
         <button type="button" className={secondaryButton} onClick={onCancel} disabled={pending}>

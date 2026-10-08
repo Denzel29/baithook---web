@@ -129,7 +129,7 @@ export const Spinner = ({ className = "" }: { className?: string }) => (
 );
 
 export const inputClass =
-  "w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-[#2016a9] focus:ring-2 focus:ring-[#2016a9]/15 disabled:cursor-not-allowed disabled:opacity-50";
+  "w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-[#2016a9] focus:ring-2 focus:ring-[#2016a9]/15 disabled:cursor-not-allowed disabled:opacity-50";
 
 export const labelClass = "mb-1.5 block text-sm font-medium text-gray-700";
 
@@ -154,7 +154,9 @@ export function countryName(code: string | null | undefined): string {
   }
 }
 
-// Centred modal. Closes on Escape or a click on the backdrop.
+// Centred modal: a rounded panel with a brand accent bar, an optional icon chip, a soft blurred
+// backdrop and a short entrance animation. Closes on Escape or a click on the backdrop. The panel is
+// capped to the screen height and its body scrolls, so tall forms never run off the screen.
 export function Dialog({
   open,
   onClose,
@@ -162,13 +164,15 @@ export function Dialog({
   description,
   children,
   wide = false,
+  icon,
 }: {
   open: boolean;
   onClose: () => void;
   title: ReactNode;
   description?: ReactNode;
   children: ReactNode;
-  wide?: boolean;
+  wide?: boolean | "xl"; // true: roomy form, "xl": the widest, for dense forms
+  icon?: ReactNode; // shown in a tinted chip beside the title
 }) {
   useEffect(() => {
     if (!open) return;
@@ -184,23 +188,38 @@ export function Dialog({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-900/40 p-4 sm:items-center" onMouseDown={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex animate-[dialog-fade_160ms_ease-out] items-start justify-center overflow-y-auto bg-slate-900/45 p-4 backdrop-blur-sm sm:items-center"
+      onMouseDown={onClose}
+    >
       <div
         role="dialog"
         aria-modal="true"
-        className={`w-full rounded-xl bg-white shadow-2xl ${wide ? "max-w-2xl" : "max-w-lg"}`}
+        className={`flex max-h-[calc(100dvh-2rem)] w-full animate-[dialog-pop_220ms_cubic-bezier(0.2,0.8,0.2,1)] flex-col overflow-hidden rounded-3xl bg-white shadow-[0_30px_90px_-20px_rgba(20,16,100,0.45)] ring-1 ring-black/5 ${
+          wide === "xl" ? "max-w-4xl" : wide ? "max-w-2xl" : "max-w-lg"
+        }`}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-4">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-            {description && <p className="mt-0.5 text-sm text-gray-500">{description}</p>}
+        <div className="h-1.5 shrink-0 bg-gradient-to-r from-[#2016a9] via-indigo-500 to-sky-400" />
+        <div className="flex shrink-0 items-start justify-between gap-4 px-7 pt-6 pb-3">
+          <div className="flex min-w-0 items-start gap-4">
+            {icon && (
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-[#2016a9] ring-1 ring-indigo-100 [&_svg]:h-5 [&_svg]:w-5">{icon}</span>
+            )}
+            <div className="min-w-0">
+              <h2 className="text-xl leading-7 font-semibold tracking-tight text-gray-900">{title}</h2>
+              {description && <p className="mt-1 text-sm leading-relaxed text-gray-500">{description}</p>}
+            </div>
           </div>
-          <button onClick={onClose} className="cursor-pointer rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700" aria-label="Close">
+          <button
+            onClick={onClose}
+            className="-mt-1 -mr-2 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 focus-visible:ring-2 focus-visible:ring-[#2016a9]/30 focus-visible:outline-none"
+            aria-label="Close"
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="px-6 py-5">{children}</div>
+        <div className="min-h-0 overflow-y-auto px-7 pt-2 pb-7">{children}</div>
       </div>
     </div>
   );

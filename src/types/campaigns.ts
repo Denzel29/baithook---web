@@ -77,6 +77,7 @@ export interface Campaign {
   organizationId: string | null;
   name: string;
   description: string;
+  learnerSummary: string;
   difficulty: Difficulty;
   focusIndicators: string[];
   templateCategories: string[];
@@ -87,9 +88,14 @@ export interface Campaign {
   maxAttempts: number | null;
   allowSpoofImperfections: boolean;
   tailorToAudience: boolean;
+  personalizeGreetings: boolean;
   publishedToCatalog: boolean;
   status: CampaignStatus;
   launchTime: string | null;
+  generationProgress: { total: number; done: number; failed: number } | null;
+  generationError: string | null;
+  llmProvider: string | null;
+  llmModel: string | null;
   createdAt: string;
   updatedAt: string;
   counts: CampaignCounts;
@@ -99,6 +105,7 @@ export type CampaignInput = Pick<
   Campaign,
   | "name"
   | "description"
+  | "learnerSummary"
   | "difficulty"
   | "focusIndicators"
   | "templateCategories"
@@ -109,6 +116,7 @@ export type CampaignInput = Pick<
   | "maxAttempts"
   | "allowSpoofImperfections"
   | "tailorToAudience"
+  | "personalizeGreetings"
 >;
 
 export interface Readiness {
@@ -171,6 +179,8 @@ export interface CampaignEmail extends EmailContent {
   reviewStatus: ReviewStatus;
   reviewerNotes: string | null;
   editedByHuman: boolean;
+  slot: Record<string, unknown> | null; // set when the AI wrote it
+  generationStatus: "done" | "generating" | "failed";
   updatedAt: string;
 }
 
@@ -193,6 +203,8 @@ export interface PageContent {
   displayUrl: string;
   kind: PageKind;
   blocks: PageBlock[];
+  // The company the page imitates and its colour; older pages have none
+  theme?: { brand: string; accent: string } | null;
 }
 
 export interface SandboxPage extends PageContent {
@@ -220,4 +232,14 @@ export interface TrainingMaterial {
   content: string;
   reviewStatus: ReviewStatus;
   reviewerNotes: string | null;
+}
+
+export interface GenerationStatus {
+  status: CampaignStatus;
+  progress: { total: number; done: number; failed: number } | null;
+  error: string | null;
+  provider: { name: string; model: string };
+  needed: { phishing: number; benign: number };
+  emailsBeingRewritten: number;
+  slots: { position: number; kind: "phishing" | "benign"; theme: string; company: string; status: "queued" | "generating" | "done" | "failed"; attempts: number; error: string | null }[];
 }

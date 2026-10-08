@@ -21,7 +21,7 @@ import { PagePreview } from "./sandbox-frame";
 const small = `${inputClass} py-1.5`;
 const iconButton = "cursor-pointer rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-30";
 
-const BLANK: PageContent = { key: "", title: "", displayUrl: "", kind: "generic", blocks: [] };
+const BLANK: PageContent = { key: "", title: "", displayUrl: "", kind: "generic", blocks: [], theme: { brand: "", accent: "#1a73e8" } };
 
 const slug = (text: string) =>
   text
@@ -126,7 +126,7 @@ const BLOCK_LABELS: Record<PageBlock["type"], string> = { heading: "Heading", te
 
 export function PageEditor({ campaignId, page, allPages, onDone }: { campaignId: string; page?: SandboxPage; allPages: SandboxPage[]; onDone: () => void }) {
   const save = useSavePage(campaignId);
-  const [v, setV] = useState<PageContent>(page ? { key: page.key, title: page.title, displayUrl: page.displayUrl, kind: page.kind, blocks: page.blocks } : BLANK);
+  const [v, setV] = useState<PageContent>(page ? { key: page.key, title: page.title, displayUrl: page.displayUrl, kind: page.kind, blocks: page.blocks, theme: page.theme ?? { brand: "", accent: "#1a73e8" } } : BLANK);
   const set = <K extends keyof PageContent>(key: K, value: PageContent[K]) => setV((s) => ({ ...s, [key]: value }));
 
   // A page may lead back to itself (e.g. "sign-in failed, try again"), so its own key is a valid target
@@ -151,10 +151,12 @@ export function PageEditor({ campaignId, page, allPages, onDone }: { campaignId:
   };
 
   const valid = v.key && v.title.trim() && v.displayUrl.trim() && v.blocks.length > 0;
+  // Without a brand name the page falls back to a neutral look
+  const theme = v.theme?.brand.trim() ? { brand: v.theme.brand.trim(), accent: v.theme.accent } : null;
 
   const submit = () =>
     save.mutate(
-      { id: page?.id, body: page ? { title: v.title, displayUrl: v.displayUrl, kind: v.kind, blocks: v.blocks } : v },
+      { id: page?.id, body: page ? { title: v.title, displayUrl: v.displayUrl, kind: v.kind, blocks: v.blocks, theme: theme } : { ...v, theme } },
       {
         onSuccess: () => {
           toast.success(page ? "Page updated. It needs review again." : "Page added");
@@ -194,6 +196,29 @@ export function PageEditor({ campaignId, page, allPages, onDone }: { campaignId:
                 <label className={labelClass}>Address shown in the browser bar</label>
                 <input className={inputClass} value={v.displayUrl} onChange={(e) => set("displayUrl", e.target.value)} placeholder="https://secure-login.example/signin" />
                 <p className="mt-1 text-xs text-gray-500">Forced onto a fake .example domain. Learners can inspect it, so make it as convincing (or as suspicious) as the email calls for.</p>
+              </div>
+              <div>
+                <label className={labelClass}>Brand name</label>
+                <input
+                  className={inputClass}
+                  value={v.theme?.brand ?? ""}
+                  onChange={(e) => set("theme", { brand: e.target.value, accent: v.theme?.accent ?? "#1a73e8" })}
+                  placeholder="Acme Payroll"
+                  maxLength={60}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Brand colour</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    className="h-10 w-14 cursor-pointer rounded-lg border border-gray-300 bg-white p-1"
+                    value={v.theme?.accent ?? "#1a73e8"}
+                    onChange={(e) => set("theme", { brand: v.theme?.brand ?? "", accent: e.target.value })}
+                    aria-label="Brand colour"
+                  />
+                  <span className="text-xs text-gray-500">Used for the logo, buttons and links on the page.</span>
+                </div>
               </div>
               <div>
                 <label className={labelClass}>Kind</label>
@@ -314,7 +339,7 @@ export function PageEditor({ campaignId, page, allPages, onDone }: { campaignId:
 
         <div className="space-y-2 xl:sticky xl:top-4 xl:self-start">
           <p className="text-sm font-medium text-gray-700">Preview (click through it)</p>
-          <PagePreview pages={[...allPages.filter((p) => p.key !== v.key), ...draftPages]} startKey={v.key || "draft"} />
+          <PagePreview pages={[...allPages.filter((p) => p.key !== v.key), ...draftPages.map((d) => ({ ...d, theme }))]} startKey={v.key || "draft"} />
         </div>
       </div>
     </div>

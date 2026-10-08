@@ -8,7 +8,7 @@ export default function PlatformCampaignsPage() {
   return (
     <PlatformShell title="Campaigns" description="Platform campaigns, written and reviewed here, are the ones individuals and companies can later enrol in.">
       <Suspense fallback={<Spinner />}>
-        <CampaignsView basePath="/dashboard/platform/campaigns" />
+        <CampaignsView basePath="/dashboard/platform/campaigns" mode="platform" />
       </Suspense>
     </PlatformShell>
   );

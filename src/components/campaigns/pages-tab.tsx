@@ -4,19 +4,34 @@ import { useState } from "react";
 import { Check, ChevronDown, ChevronUp, Globe, Loader2, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, EmptyState, Panel, Spinner, StatusBadge, inputClass, labelClass, primaryButton, secondaryButton } from "@/components/dashboard/ui";
-import { useCreatePagesFromPattern, useEmails, usePageReview, usePagePatterns, usePages } from "@/lib/hooks/use-campaigns";
+import { useBulkApprovePages, useCreatePagesFromPattern, useEmails, usePageReview, usePagePatterns, usePages } from "@/lib/hooks/use-campaigns";
 import { blockActions, describeAction } from "@/lib/sandbox";
 import { PAGE_KIND_LABELS, type Campaign, type SandboxPage } from "@/types/campaigns";
 import { PageEditor } from "./page-editor";
 import { PagePreview } from "./sandbox-frame";
 
 export function PagesTab({ campaign, editable }: { campaign: Campaign; editable: boolean }) {
-  const pages = usePages(campaign.id);
+  const pages = usePages(campaign.id, campaign.status === "generating");
   const emails = useEmails(campaign.id);
   const [editing, setEditing] = useState<SandboxPage | "new" | null>(null);
   const [patternOpen, setPatternOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const bulk = useBulkApprovePages(campaign.id);
 
   const list = pages.data ?? [];
+  const allSelected = list.length > 0 && list.every((p) => selected.has(p.id));
+  const pendingCount = list.filter((p) => p.reviewStatus === "pending").length;
+
+  const approve = (ids: string[] | undefined) =>
+    bulk.mutate(ids, {
+      onSuccess: ({ approved, skipped }) => {
+        setSelected(new Set());
+        if (skipped.length === 0) toast.success(`${approved} page${approved === 1 ? "" : "s"} approved`);
+        else toast.warning(`${approved} approved, ${skipped.length} skipped: ${skipped[0].key || "a page"} ${skipped[0].reason}`);
+      },
+      onError: (e) => toast.error(e.message),
+    });
+
   if (editing) return <PageEditor campaignId={campaign.id} page={editing === "new" ? undefined : editing} allPages={list} onDone={() => setEditing(null)} />;
 
   // Which emails open each page, so authors can see what is in use
@@ -41,6 +56,31 @@ export function PagesTab({ campaign, editable }: { campaign: Campaign; editable:
         )}
       </div>
 
+      {editable && list.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3">
+          <label className="flex cursor-pointer items-center gap-3 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-[#2016a9]"
+              checked={allSelected}
+              ref={(el) => {
+                if (el) el.indeterminate = selected.size > 0 && !allSelected;
+              }}
+              onChange={() => setSelected(allSelected ? new Set() : new Set(list.map((p) => p.id)))}
+            />
+            {selected.size > 0 ? `${selected.size} selected` : "Select all"}
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <button className={secondaryButton} disabled={selected.size === 0 || bulk.isPending} onClick={() => approve([...selected])}>
+              {bulk.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Approve selected{selected.size ? ` (${selected.size})` : ""}
+            </button>
+            <button className={primaryButton} disabled={pendingCount === 0 || bulk.isPending} onClick={() => approve(undefined)}>
+              <Check className="h-4 w-4" /> Approve all pending{pendingCount ? ` (${pendingCount})` : ""}
+            </button>
+          </div>
+        </div>
+      )}
+
       {pages.isLoading ? (
         <Spinner />
       ) : list.length === 0 ? (
@@ -52,7 +92,17 @@ export function PagesTab({ campaign, editable }: { campaign: Campaign; editable:
       ) : (
         <div className="space-y-3">
           {list.map((p) => (
-            <PageCard key={p.id} page={p} all={list} campaignId={campaign.id} editable={editable} usedBy={openedBy(p.key).length} onEdit={() => setEditing(p)} />
+            <PageCard
+              key={p.id}
+              page={p}
+              all={list}
+              campaignId={campaign.id}
+              editable={editable}
+              usedBy={openedBy(p.key).length}
+              selected={selected.has(p.id)}
+              onToggle={() => setSelected((s) => { const next = new Set(s); if (next.has(p.id)) next.delete(p.id); else next.add(p.id); return next; })}
+              onEdit={() => setEditing(p)}
+            />
           ))}
         </div>
       )}
@@ -62,7 +112,25 @@ export function PagesTab({ campaign, editable }: { campaign: Campaign; editable:
   );
 }
 
-function PageCard({ page, all, campaignId, editable, usedBy, onEdit }: { page: SandboxPage; all: SandboxPage[]; campaignId: string; editable: boolean; usedBy: number; onEdit: () => void }) {
+function PageCard({
+  page,
+  all,
+  campaignId,
+  editable,
+  usedBy,
+  selected,
+  onToggle,
+  onEdit,
+}: {
+  page: SandboxPage;
+  all: SandboxPage[];
+  campaignId: string;
+  editable: boolean;
+  usedBy: number;
+  selected: boolean;
+  onToggle: () => void;
+  onEdit: () => void;
+}) {
   const review = usePageReview(campaignId);
   const [open, setOpen] = useState(false);
   const [rejecting, setRejecting] = useState(false);
@@ -83,9 +151,10 @@ function PageCard({ page, all, campaignId, editable, usedBy, onEdit }: { page: S
     );
 
   return (
-    <article className="rounded-xl border border-gray-200 bg-white shadow-sm">
+    <article className={`rounded-xl border bg-white shadow-sm ${selected ? "border-[#2016a9] ring-1 ring-[#2016a9]" : "border-gray-200"}`}>
       <div className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
-        <div className="min-w-0">
+        {editable && <input type="checkbox" className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-[#2016a9]" checked={selected} onChange={onToggle} aria-label={`Select ${page.title}`} />}
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-md bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{PAGE_KIND_LABELS[page.kind]}</span>
             <StatusBadge status={page.reviewStatus} />
@@ -177,7 +246,7 @@ function PatternDialog({ campaignId, open, onClose }: { campaignId: string; open
     );
 
   return (
-    <Dialog open={open} onClose={onClose} title="Start from a pattern" description="Creates a set of linked pages you can then edit." wide>
+    <Dialog open={open} onClose={onClose} title="Start from a pattern" icon={<Sparkles />} description="Creates a set of linked pages you can then edit." wide>
       <div className="space-y-5">
         <div className="grid gap-3 sm:grid-cols-2">
           {(patterns.data ?? []).map((p) => (

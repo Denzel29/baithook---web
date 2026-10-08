@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Panel, inputClass, labelClass, primaryButton, secondaryButton } from "@/components/dashboard/ui";
 import { useIndicators, usePages, useSaveEmail } from "@/lib/hooks/use-campaigns";
 import type { CampaignEmail, EmailContent, EmailLink, SandboxPage } from "@/types/campaigns";
+import { MERGE_FIELDS, fillSample } from "@/lib/placeholders";
 import { EmailView } from "./email-view";
 
 const BLANK: EmailContent = {
@@ -113,7 +114,22 @@ export function EmailEditor({ campaignId, email, onDone }: { campaignId: string;
             </div>
             <div>
               <label className={labelClass}>Greeting</label>
-              <input className={inputClass} value={v.greeting} onChange={(e) => set("greeting", e.target.value)} placeholder="Hi Sam," />
+              <input className={inputClass} value={v.greeting} onChange={(e) => set("greeting", e.target.value)} placeholder="Hi {{firstName}}," />
+              <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+                Greet each learner by name with a merge field:
+                {MERGE_FIELDS.map((field) => (
+                  <button
+                    key={field.token}
+                    type="button"
+                    title={`Adds ${field.token} to the greeting`}
+                    className="cursor-pointer rounded-full bg-indigo-50 px-2.5 py-0.5 font-medium text-[#2016a9] transition hover:bg-indigo-100"
+                    onClick={() => set("greeting", `${v.greeting}${v.greeting && !v.greeting.endsWith(" ") ? " " : ""}${field.token}`)}
+                  >
+                    {field.label}
+                  </button>
+                ))}
+                <span className="basis-full">Works in the subject and body too. The preview shows a sample name; learners see their own.</span>
+              </p>
             </div>
             <div>
               <label className={labelClass}>Body</label>
@@ -234,7 +250,7 @@ export function EmailEditor({ campaignId, email, onDone }: { campaignId: string;
 
         <div className="space-y-2 xl:sticky xl:top-4 xl:self-start">
           <p className="text-sm font-medium text-gray-700">Preview</p>
-          <EmailView email={v} />
+          <EmailView email={v} fill={fillSample} />
         </div>
       </div>
     </div>
