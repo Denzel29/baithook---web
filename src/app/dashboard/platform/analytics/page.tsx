@@ -1,10 +1,9 @@
 "use client";
 
 import { useAuth } from "@/providers/auth-provider";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { PlatformShell } from "@/components/platform/platform-shell";
+import { useMemo, useState } from "react";
 import {
-	BarChart3,
 	Users,
 	Eye,
 	UserPlus,
@@ -12,7 +11,6 @@ import {
 	TrendingUp,
 	Clock,
 	Globe,
-	ArrowLeft,
 	RefreshCw,
 	CalendarDays,
 } from "lucide-react";
@@ -64,7 +62,7 @@ function formatDateTime(iso: string): string {
 // ─── Color palette ────────────────────────────────────────────────────────────
 
 const PIE_COLORS = [
-	"#405189",
+	"#2016a9",
 	"#0ab39c",
 	"#299cdb",
 	"#f7b84b",
@@ -100,6 +98,16 @@ const ACTION_LABELS: Record<string, string> = {
 	launched: "Launched",
 	completed: "Completed",
 	archived: "Archived",
+	onboarding_requested: "Company Requested",
+	onboarding_verified: "Request Verified",
+	approved: "Request Approved",
+	rejected: "Request Rejected",
+	suspended: "Suspended",
+	reactivated: "Reactivated",
+	invited: "Invite Sent",
+	invite_accepted: "Invite Accepted",
+	invite_revoked: "Invite Revoked",
+	plan_limit_exceeded: "Plan Limit Exceeded",
 };
 
 // ─── Preset date ranges ──────────────────────────────────────────────────────
@@ -129,13 +137,10 @@ function getDateFrom(range: DateRange): string | undefined {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AnalyticsDashboardPage() {
-	const { user, token, isAuthenticated, logout } = useAuth();
-	const router = useRouter();
+	// Sign-in and role checks live in PlatformShell, which waits for the stored
+	// session to load before redirecting
+	const { user, token } = useAuth();
 	const [range, setRange] = useState<DateRange>("30d");
-
-	useEffect(() => {
-		if (!isAuthenticated) router.push("/login");
-	}, [isAuthenticated, router]);
 
 	const from = getDateFrom(range);
 	const to = undefined; // always "up to now"
@@ -186,81 +191,46 @@ export default function AnalyticsDashboardPage() {
 		audit.refetch();
 	};
 
+	const controls = (
+		<>
+			<div className="inline-flex gap-1 rounded-lg bg-gray-100 p-1">
+				{DATE_RANGES.map((dr) => (
+					<button
+						key={dr.value}
+						onClick={() => setRange(dr.value)}
+						aria-pressed={range === dr.value}
+						className={`cursor-pointer rounded-md px-3 py-1.5 text-sm transition ${
+							range === dr.value
+								? "bg-white font-semibold text-gray-900 shadow-sm ring-1 ring-gray-200"
+								: "font-medium text-gray-600 hover:text-gray-900"
+						}`}
+					>
+						{dr.label}
+					</button>
+				))}
+			</div>
+			<button
+				onClick={handleRefresh}
+				disabled={isLoading}
+				className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+			>
+				<RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+				<span className="hidden sm:inline">Refresh</span>
+			</button>
+		</>
+	);
+
 	return (
-		<div className="min-h-screen bg-[#f3f3f9]">
-			{/* ── Header ────────────────────────────────────────────── */}
-			<header className="sticky top-0 z-40 border-b border-slate-200/60 bg-white shadow-sm">
-				<div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between px-4 sm:px-6 lg:px-8">
-					<div className="flex items-center gap-4">
-						<button
-							onClick={() => router.push("/dashboard/platform")}
-							className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
-						>
-							<ArrowLeft className="h-4 w-4" />
-							<span className="hidden sm:inline">Dashboard</span>
-						</button>
-						<div className="h-5 w-px bg-slate-200" />
-						<div className="flex items-center gap-2">
-							<div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#405189]">
-								<BarChart3 className="h-4 w-4 text-white" />
-							</div>
-							<h1 className="text-base font-semibold text-slate-800">
-								Analytics
-							</h1>
-						</div>
-					</div>
-
-					<div className="flex items-center gap-3">
-						{/* Date Range Selector */}
-						<div className="flex items-center rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm">
-							{DATE_RANGES.map((dr) => (
-								<button
-									key={dr.value}
-									onClick={() => setRange(dr.value)}
-									className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
-										range === dr.value
-											? "bg-[#405189] text-white shadow-sm"
-											: "text-slate-500 hover:text-slate-800"
-									}`}
-								>
-									{dr.label}
-								</button>
-							))}
-						</div>
-						<button
-							onClick={handleRefresh}
-							disabled={isLoading}
-							className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
-						>
-							<RefreshCw
-								className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`}
-							/>
-							<span className="hidden sm:inline">Refresh</span>
-						</button>
-					</div>
-				</div>
-			</header>
-
-			{/* ── Content ───────────────────────────────────────────── */}
-			<main className="mx-auto mt-6 max-w-[1440px] space-y-6 px-4 pb-12 sm:px-6 lg:px-8">
-				{/* ── Page title ────────────────────────────────────── */}
-				<div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-					<div>
-						<h2 className="text-lg font-semibold text-slate-800">
-							Platform Analytics
-						</h2>
-						<p className="text-sm text-slate-500">
-							{range === "all"
-								? "Showing all-time data"
-								: `Last ${range.replace("d", " days")} overview`}
-						</p>
-					</div>
-					<div className="flex items-center gap-1.5 text-xs text-slate-400">
-						<CalendarDays className="h-3.5 w-3.5" />
-						{from ? `${formatDate(from)} – Today` : "All time"}
-					</div>
-				</div>
-
+		<PlatformShell
+			title="Analytics"
+			description={
+				<span className="inline-flex items-center gap-1.5">
+					<CalendarDays className="h-4 w-4" />
+					{from ? `${formatDate(from)} – today` : "All-time data"}
+				</span>
+			}
+			actions={controls}
+		>
 				{/* ── KPI Cards ─────────────────────────────────────── */}
 				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
 					<KpiCard
@@ -278,7 +248,7 @@ export default function AnalyticsDashboardPage() {
 						isLoading={summary.isLoading}
 					/>
 					<KpiCard
-						icon={<Eye className="h-5 w-5 text-[#405189]" />}
+						icon={<Eye className="h-5 w-5 text-[#2016a9]" />}
 						iconBg="bg-[#e8e6f1]"
 						label="PAGE VIEWS"
 						value={summary.data?.totalPageViews}
@@ -296,19 +266,19 @@ export default function AnalyticsDashboardPage() {
 				{/* ── Row 2: Visitors chart + Category breakdown ──── */}
 				<div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
 					{/* Visitor traffic area chart */}
-					<div className="col-span-1 rounded-lg border border-slate-200/60 bg-white p-5 shadow-sm lg:col-span-2">
+					<div className="col-span-1 rounded-xl border border-gray-200 bg-white p-5 shadow-sm lg:col-span-2">
 						<div className="mb-4 flex items-center justify-between">
 							<div>
-								<h3 className="text-sm font-semibold text-slate-700">
+								<h3 className="text-sm font-semibold text-gray-700">
 									Visitor Traffic
 								</h3>
-								<p className="text-xs text-slate-400">
+								<p className="text-xs text-gray-400">
 									Daily unique &amp; returning visitors
 								</p>
 							</div>
-							<div className="flex items-center gap-4 text-xs text-slate-500">
+							<div className="flex items-center gap-4 text-xs text-gray-500">
 								<span className="flex items-center gap-1.5">
-									<span className="inline-block h-2.5 w-2.5 rounded-full bg-[#405189]" />
+									<span className="inline-block h-2.5 w-2.5 rounded-full bg-[#2016a9]" />
 									Unique
 								</span>
 								<span className="flex items-center gap-1.5">
@@ -337,12 +307,12 @@ export default function AnalyticsDashboardPage() {
 										>
 											<stop
 												offset="5%"
-												stopColor="#405189"
+												stopColor="#2016a9"
 												stopOpacity={0.2}
 											/>
 											<stop
 												offset="95%"
-												stopColor="#405189"
+												stopColor="#2016a9"
 												stopOpacity={0}
 											/>
 										</linearGradient>
@@ -394,7 +364,7 @@ export default function AnalyticsDashboardPage() {
 									<Area
 										type="monotone"
 										dataKey="unique"
-										stroke="#405189"
+										stroke="#2016a9"
 										strokeWidth={2}
 										fill="url(#uniqueGrad)"
 										dot={false}
@@ -415,11 +385,11 @@ export default function AnalyticsDashboardPage() {
 					</div>
 
 					{/* Category breakdown pie chart */}
-					<div className="rounded-lg border border-slate-200/60 bg-white p-5 shadow-sm">
-						<h3 className="mb-1 text-sm font-semibold text-slate-700">
+					<div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+						<h3 className="mb-1 text-sm font-semibold text-gray-700">
 							Events by Category
 						</h3>
-						<p className="mb-4 text-xs text-slate-400">
+						<p className="mb-4 text-xs text-gray-400">
 							Distribution of tracked events
 						</p>
 						{summary.isLoading ? (
@@ -469,12 +439,12 @@ export default function AnalyticsDashboardPage() {
 				{/* ── Row 3: Top Actions bar chart + Audit Log ──── */}
 				<div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
 					{/* Top actions horizontal bar chart */}
-					<div className="rounded-lg border border-slate-200/60 bg-white p-5 shadow-sm">
+					<div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
 						<div className="mb-4">
-							<h3 className="text-sm font-semibold text-slate-700">
+							<h3 className="text-sm font-semibold text-gray-700">
 								Top Actions
 							</h3>
-							<p className="text-xs text-slate-400">
+							<p className="text-xs text-gray-400">
 								Most frequent events in this period
 							</p>
 						</div>
@@ -522,7 +492,7 @@ export default function AnalyticsDashboardPage() {
 									/>
 									<Bar
 										dataKey="count"
-										fill="#405189"
+										fill="#2016a9"
 										radius={[0, 4, 4, 0]}
 										barSize={20}
 									/>
@@ -532,18 +502,18 @@ export default function AnalyticsDashboardPage() {
 					</div>
 
 					{/* Recent audit log */}
-					<div className="rounded-lg border border-slate-200/60 bg-white p-5 shadow-sm">
+					<div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
 						<div className="mb-4 flex items-center justify-between">
 							<div>
-								<h3 className="text-sm font-semibold text-slate-700">
+								<h3 className="text-sm font-semibold text-gray-700">
 									Recent Activity
 								</h3>
-								<p className="text-xs text-slate-400">
+								<p className="text-xs text-gray-400">
 									Latest platform events
 								</p>
 							</div>
 							{audit.data && (
-								<span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+								<span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">
 									{audit.data.total.toLocaleString()} total
 								</span>
 							)}
@@ -555,17 +525,17 @@ export default function AnalyticsDashboardPage() {
 										key={i}
 										className="flex animate-pulse items-start gap-3"
 									>
-										<div className="h-8 w-8 rounded-full bg-slate-100" />
+										<div className="h-8 w-8 rounded-full bg-gray-100" />
 										<div className="flex-1 space-y-1.5">
-											<div className="h-3 w-3/4 rounded bg-slate-100" />
-											<div className="h-2.5 w-1/2 rounded bg-slate-50" />
+											<div className="h-3 w-3/4 rounded bg-gray-100" />
+											<div className="h-2.5 w-1/2 rounded bg-gray-50" />
 										</div>
 									</div>
 								))}
 							</div>
 						) : !audit.data?.data.length ? (
 							<div className="flex h-[300px] items-center justify-center">
-								<p className="text-sm text-slate-400">
+								<p className="text-sm text-gray-400">
 									No activity recorded yet
 								</p>
 							</div>
@@ -578,8 +548,7 @@ export default function AnalyticsDashboardPage() {
 						)}
 					</div>
 				</div>
-			</main>
-		</div>
+		</PlatformShell>
 	);
 }
 
@@ -599,15 +568,15 @@ function KpiCard({
 	isLoading: boolean;
 }) {
 	return (
-		<div className="group flex items-center justify-between rounded-lg border border-slate-200/60 bg-white px-5 py-4 shadow-sm transition-shadow duration-200 hover:shadow-md">
+		<div className="group flex items-center justify-between rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm transition-shadow duration-200 hover:shadow-md">
 			<div>
-				<p className="text-[11px] font-semibold tracking-wider text-slate-400">
+				<p className="text-[11px] font-semibold tracking-wider text-gray-400">
 					{label}
 				</p>
 				{isLoading ? (
-					<div className="mt-2 h-7 w-16 animate-pulse rounded bg-slate-100" />
+					<div className="mt-2 h-7 w-16 animate-pulse rounded bg-gray-100" />
 				) : (
-					<p className="mt-1 text-2xl font-bold tracking-tight text-slate-800">
+					<p className="mt-1 text-2xl font-bold tracking-tight text-gray-800">
 						{value?.toLocaleString() ?? "—"}
 					</p>
 				)}
@@ -636,7 +605,7 @@ function AuditLogItem({
 }) {
 	const categoryColor: Record<string, string> = {
 		auth: "bg-blue-100 text-blue-700",
-		page_view: "bg-slate-100 text-slate-600",
+		page_view: "bg-gray-100 text-gray-600",
 		campaign: "bg-amber-100 text-amber-700",
 		scenario: "bg-purple-100 text-purple-700",
 		user_mgmt: "bg-emerald-100 text-emerald-700",
@@ -647,16 +616,16 @@ function AuditLogItem({
 
 	const actionLabel = ACTION_LABELS[event.action] ?? event.action;
 	const catLabel = CATEGORY_LABELS[event.category] ?? event.category;
-	const colorCls = categoryColor[event.category] ?? "bg-slate-100 text-slate-600";
+	const colorCls = categoryColor[event.category] ?? "bg-gray-100 text-gray-600";
 
 	return (
-		<div className="flex items-start gap-3 rounded-md px-2 py-2.5 transition hover:bg-slate-50/80">
-			<div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100">
-				<Activity className="h-3.5 w-3.5 text-slate-500" />
+		<div className="flex items-start gap-3 rounded-md px-2 py-2.5 transition hover:bg-gray-50/80">
+			<div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100">
+				<Activity className="h-3.5 w-3.5 text-gray-500" />
 			</div>
 			<div className="min-w-0 flex-1">
 				<div className="flex items-center gap-2">
-					<span className="text-sm font-medium text-slate-700 truncate">
+					<span className="text-sm font-medium text-gray-700 truncate">
 						{actionLabel}
 					</span>
 					<span
@@ -665,13 +634,13 @@ function AuditLogItem({
 						{catLabel}
 					</span>
 				</div>
-				<div className="mt-0.5 flex items-center gap-2 text-[11px] text-slate-400">
+				<div className="mt-0.5 flex items-center gap-2 text-[11px] text-gray-400">
 					<Clock className="h-3 w-3" />
 					<span>{formatDateTime(event.occurredAt)}</span>
 					{event.resourceType && (
 						<>
-							<span className="text-slate-300">·</span>
-							<span className="text-slate-500">{event.resourceType}</span>
+							<span className="text-gray-300">·</span>
+							<span className="text-gray-500">{event.resourceType}</span>
 						</>
 					)}
 				</div>
@@ -683,13 +652,13 @@ function AuditLogItem({
 function ChartSkeleton({ height }: { height: number }) {
 	return (
 		<div
-			className="flex animate-pulse items-end justify-between gap-2 rounded-lg bg-slate-50 px-4 pb-4"
+			className="flex animate-pulse items-end justify-between gap-2 rounded-lg bg-gray-50 px-4 pb-4"
 			style={{ height }}
 		>
 			{Array.from({ length: 12 }).map((_, i) => (
 				<div
 					key={i}
-					className="w-full rounded-t bg-slate-200"
+					className="w-full rounded-t bg-gray-200"
 					style={{ height: `${30 + Math.random() * 50}%` }}
 				/>
 			))}
@@ -706,11 +675,11 @@ function EmptyChart({
 }) {
 	return (
 		<div
-			className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-200 bg-slate-50/50"
+			className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-200 bg-gray-50/50"
 			style={{ height }}
 		>
-			<TrendingUp className="mb-2 h-8 w-8 text-slate-300" />
-			<p className="text-sm text-slate-400">{message}</p>
+			<TrendingUp className="mb-2 h-8 w-8 text-gray-300" />
+			<p className="text-sm text-gray-400">{message}</p>
 		</div>
 	);
 }

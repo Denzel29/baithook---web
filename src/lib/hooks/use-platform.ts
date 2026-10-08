@@ -2,6 +2,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
 import type {
+	DomainChangeRequestReview,
+	PersonalAccount,
+	PersonalAccountDetail,
+	Invite,
 	OnboardingChecklist,
 	OnboardingRequest,
 	OnboardingRequestDetail,
@@ -24,13 +28,13 @@ function query(params: Record<string, string | number | undefined>): string {
 
 // ── Onboarding requests ──────────────────────────────────────────────────────
 
-export function useOnboardingRequests(status?: OnboardingRequestStatus) {
+export function useOnboardingRequests(status?: OnboardingRequestStatus, enabled = true) {
 	const { token } = useAuth();
 	return useQuery<Paginated<OnboardingRequest>>({
 		queryKey: ["platform", "onboarding-requests", status],
 		queryFn: () =>
 			apiRequest(`/onboarding-requests${query({ status, limit: 100 })}`, { token: token! }),
-		enabled: !!token,
+		enabled: !!token && enabled,
 	});
 }
 
@@ -118,6 +122,16 @@ export function useOrganizationUsage(id: string | null) {
 	});
 }
 
+// The invite emailed to the owner on approval, while they haven't joined
+export function useOwnerInvite(id: string | null, enabled: boolean) {
+	const { token } = useAuth();
+	return useQuery<(Invite & { ownerJoined: boolean }) | null>({
+		queryKey: ["platform", "organization", id, "owner-invite"],
+		queryFn: () => apiRequest(`/organizations/${id}/owner-invite`, { token: token! }),
+		enabled: !!token && !!id && enabled,
+	});
+}
+
 // One mutation hook per admin action; each refreshes every platform query on success
 function useOrgMutation<TVars extends { id: string }>(
 	build: (vars: TVars) => { path: string; method: "POST" | "PATCH"; body?: unknown }
@@ -140,6 +154,9 @@ export const useSuspendOrganization = () =>
 		body: { reason },
 	}));
 
+export const useResendOwnerInvite = () =>
+	useOrgMutation(({ id }: { id: string }) => ({ path: `/organizations/${id}/owner-invite/resend`, method: "POST" }));
+
 export const useActivateOrganization = () =>
 	useOrgMutation(({ id }: { id: string }) => ({ path: `/organizations/${id}/activate`, method: "POST" }));
 
@@ -158,3 +175,54 @@ export const useUpdateOrganizationEmailPolicy = () =>
 			body,
 		})
 	);
+
+// ── Domain change requests ───────────────────────────────────────────────────
+
+export function useDomainRequests(status?: string, enabled = true) {
+	const { token } = useAuth();
+	return useQuery<DomainChangeRequestReview[]>({
+		queryKey: ["platform", "domain-requests", status],
+		queryFn: () => apiRequest(`/domain-requests${status ? `?status=${status}` : ""}`, { token: token! }),
+		enabled: !!token && enabled,
+	});
+}
+
+export function useReviewDomainRequest() {
+	const { token } = useAuth();
+	const qc = useQueryClient();
+	return useMutation({
+		mutationFn: ({ id, decision, note }: { id: string; decision: "approve" | "reject"; note?: string }) =>
+			apiRequest(`/domain-requests/${id}/${decision}`, { method: "POST", body: { note }, token: token! }),
+		onSuccess: () => qc.invalidateQueries({ queryKey: ["platform"] }),
+	});
+}
+
+// ── Personal accounts (users without a company) ──────────────────────────────
+
+export function usePersonalAccounts(filters: { status?: string; search?: string }) {
+	const { token } = useAuth();
+	return useQuery<Paginated<PersonalAccount> & { counts: Record<string, number> }>({
+		queryKey: ["platform", "users", filters.status, filters.search],
+		queryFn: () => apiRequest(`/platform/users${query({ ...filters, limit: 100 })}`, { token: token! }),
+		enabled: !!token,
+	});
+}
+
+export function usePersonalAccount(id: string | null) {
+	const { token } = useAuth();
+	return useQuery<PersonalAccountDetail>({
+		queryKey: ["platform", "users", "detail", id],
+		queryFn: () => apiRequest(`/platform/users/${id}`, { token: token! }),
+		enabled: !!token && !!id,
+	});
+}
+
+export function usePersonalAccountAction() {
+	const { token } = useAuth();
+	const qc = useQueryClient();
+	return useMutation({
+		mutationFn: ({ id, action }: { id: string; action: "suspend" | "reactivate" | "resend-activation" | "password-reset" }) =>
+			apiRequest<{ message?: string }>(`/platform/users/${id}/${action}`, { method: "POST", token: token! }),
+		onSuccess: () => qc.invalidateQueries({ queryKey: ["platform", "users"] }),
+	});
+}

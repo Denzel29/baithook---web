@@ -28,7 +28,7 @@ export function SiteFooter() {
             <Link href="/login" className="text-sm text-gray-600 hover:text-[#435d89]">
               Login
             </Link>
-            <Link href="/register-organization" className="text-sm text-gray-600 hover:text-orange-500">
+            <Link href="/register-organization" className="text-sm text-gray-600 hover:text-[#2016a9]">
               For Organizations
             </Link>
             <Link href="/sandbox" className="text-sm text-gray-600 hover:text-green-600">

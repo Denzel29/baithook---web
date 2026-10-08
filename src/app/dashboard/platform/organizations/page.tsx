@@ -3,10 +3,11 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, CheckCircle2, Circle, Loader2, Search } from "lucide-react";
+import { ArrowLeft, Building2, CheckCircle2, Circle, Loader2, Search, SearchX } from "lucide-react";
 import { toast } from "sonner";
 import {
   Detail,
+  EmptyState,
   FilterTabs,
   Panel,
   PlatformShell,
@@ -15,15 +16,21 @@ import {
   dangerButton,
   formatDate,
   inputClass,
+  labelClass,
   primaryButton,
   secondaryButton,
+  Spinner,
 } from "@/components/platform/platform-shell";
 import { OnboardingRequestsTab } from "@/components/platform/onboarding-requests";
+import { DomainRequestsTab } from "@/components/platform/domain-requests";
 import {
   useActivateOrganization,
   useOrganization,
   useOrganizationChecklist,
   useOrganizationUsage,
+  useOwnerInvite,
+  useResendOwnerInvite,
+  useDomainRequests,
   useOnboardingRequests,
   useOrganizations,
   useSuspendOrganization,
@@ -65,32 +72,39 @@ const LIMIT_LABELS: Record<string, string> = {
 };
 
 // Companies and the requests from companies waiting to join live on one page
-function CompaniesView() {
-  const tab = useSearchParams().get("tab") === "requests" ? "requests" : "companies";
-  const pending = useOnboardingRequests(OnboardingRequestStatus.PENDING);
-  const pendingCount = pending.data?.total ?? 0;
+type CompaniesTab = "companies" | "requests" | "domains";
 
-  const tabClass = (active: boolean) =>
-    `-mb-px flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition ${
-      active ? "border-[#405189] text-[#405189]" : "border-transparent text-slate-500 hover:text-slate-800"
-    }`;
+function CompaniesView() {
+  const param = useSearchParams().get("tab");
+  const tab: CompaniesTab = param === "requests" || param === "domains" ? param : "companies";
+  const pendingCompanies = useOnboardingRequests(OnboardingRequestStatus.PENDING).data?.total ?? 0;
+  const pendingDomains = useDomainRequests("pending").data?.length ?? 0;
+
+  const tabs: { key: CompaniesTab; label: string; href: string; count: number }[] = [
+    { key: "companies", label: "Companies", href: "/dashboard/platform/organizations", count: 0 },
+    { key: "requests", label: "Join requests", href: "/dashboard/platform/organizations?tab=requests", count: pendingCompanies },
+    { key: "domains", label: "Domain requests", href: "/dashboard/platform/organizations?tab=domains", count: pendingDomains },
+  ];
 
   return (
     <div className="space-y-6">
-      <nav className="flex border-b border-slate-200" aria-label="Companies sections">
-        <Link href="/dashboard/platform/organizations" className={tabClass(tab === "companies")}>
-          Companies
-        </Link>
-        <Link href="/dashboard/platform/organizations?tab=requests" className={tabClass(tab === "requests")}>
-          Requests
-          {pendingCount > 0 && (
-            <span className="rounded-full bg-[#f06548] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
-              {pendingCount}
-            </span>
-          )}
-        </Link>
+      <nav className="flex overflow-x-auto overflow-y-hidden border-b border-gray-200" aria-label="Companies sections">
+        {tabs.map((t) => (
+          <Link
+            key={t.key}
+            href={t.href}
+            className={`-mb-px flex shrink-0 items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition ${
+              tab === t.key ? "border-[#2016a9] text-[#2016a9]" : "border-transparent text-gray-500 hover:text-gray-800"
+            }`}
+          >
+            {t.label}
+            {t.count > 0 && (
+              <span className="rounded-full bg-[#2016a9] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">{t.count}</span>
+            )}
+          </Link>
+        ))}
       </nav>
-      {tab === "requests" ? <OnboardingRequestsTab /> : <OrganizationsView />}
+      {tab === "requests" ? <OnboardingRequestsTab /> : tab === "domains" ? <DomainRequestsTab /> : <OrganizationsView />}
     </div>
   );
 }
@@ -112,45 +126,60 @@ function OrganizationsView() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <FilterTabs value={filter} options={FILTERS} onChange={setFilter} />
         <div className="relative sm:w-72">
-          <Search className="absolute top-2.5 left-3 h-4 w-4 text-slate-400" />
+          <Search className="absolute top-2.5 left-3 h-4 w-4 text-gray-400" />
           <input className={`${inputClass} pl-9`} placeholder="Search name or domain" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
       </div>
 
-      <Panel>
+      <Panel flush>
         {orgs.isLoading ? (
-          <Loader2 className="mx-auto h-6 w-6 animate-spin text-[#405189]" />
+          <div className="py-12">
+            <Spinner />
+          </div>
         ) : orgs.isError ? (
-          <p className="text-sm text-red-600">{(orgs.error as Error).message}</p>
+          <p className="p-6 text-sm text-red-600">{(orgs.error as Error).message}</p>
         ) : !orgs.data?.data.length ? (
-          <p className="py-6 text-center text-sm text-slate-500">
-            No companies yet. Approve a request to create one.
-          </p>
+          search.trim() || filter !== "all" ? (
+            <EmptyState icon={SearchX} title="No matching companies">
+              Try a different search or status filter.
+            </EmptyState>
+          ) : (
+            <EmptyState icon={Building2} title="No companies yet">
+              Companies appear here once you approve their request in the Requests tab.
+            </EmptyState>
+          )
         ) : (
-          <div className="-mx-5 -my-5 overflow-x-auto">
+          <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+              <thead className="border-b border-gray-200 bg-gray-50 text-xs font-medium tracking-wide text-gray-500 uppercase">
                 <tr>
-                  <th className="px-5 py-3 font-medium">Company</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
-                  <th className="px-5 py-3 font-medium">Plan</th>
-                  <th className="px-5 py-3 font-medium">Domain</th>
-                  <th className="px-5 py-3 font-medium">Created</th>
+                  <th className="px-6 py-3 font-medium">Company</th>
+                  <th className="px-6 py-3 font-medium">Status</th>
+                  <th className="px-6 py-3 font-medium">Plan</th>
+                  <th className="px-6 py-3 font-medium">Domain</th>
+                  <th className="px-6 py-3 font-medium">Created</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-gray-100">
                 {orgs.data.data.map((o) => (
-                  <tr key={o.id} onClick={() => select(o.id)} className="cursor-pointer transition hover:bg-slate-50">
-                    <td className="px-5 py-3 font-medium text-slate-800">{o.name}</td>
-                    <td className="px-5 py-3">
+                  <tr key={o.id} onClick={() => select(o.id)} className="cursor-pointer transition hover:bg-gray-50">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-sm font-semibold text-[#2016a9]">
+                          {o.name.charAt(0).toUpperCase()}
+                        </span>
+                        <span className="font-semibold text-gray-900">{o.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
                       <StatusBadge status={o.status} />
                     </td>
-                    <td className="px-5 py-3 capitalize text-slate-600">
+                    <td className="px-6 py-4 text-gray-600 capitalize">
                       {o.planTier}
-                      {o.seatLimit ? <span className="text-slate-400"> · {o.seatLimit} seats</span> : null}
+                      {o.seatLimit ? <span className="text-gray-400"> · {o.seatLimit} seats</span> : null}
                     </td>
-                    <td className="px-5 py-3 text-slate-600">{o.primaryDomain ?? "—"}</td>
-                    <td className="px-5 py-3 text-slate-500">{formatDate(o.createdAt)}</td>
+                    <td className="px-6 py-4 text-gray-600">{o.primaryDomain ?? "—"}</td>
+                    <td className="px-6 py-4 text-gray-500">{formatDate(o.createdAt)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -167,7 +196,7 @@ function OrganizationDetail({ id, onBack }: { id: string; onBack: () => void }) 
   const checklist = useOrganizationChecklist(id);
   const usage = useOrganizationUsage(id);
 
-  if (org.isLoading) return <Loader2 className="mx-auto h-6 w-6 animate-spin text-[#405189]" />;
+  if (org.isLoading) return <Spinner />;
   if (org.isError || !org.data) {
     return (
       <Panel>
@@ -179,7 +208,7 @@ function OrganizationDetail({ id, onBack }: { id: string; onBack: () => void }) 
 
   return (
     <div className="space-y-6">
-      <button onClick={onBack} className="flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900">
+      <button onClick={onBack} className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900">
         <ArrowLeft className="h-4 w-4" /> All companies
       </button>
 
@@ -203,14 +232,14 @@ function OrganizationDetail({ id, onBack }: { id: string; onBack: () => void }) 
 
         <Panel title="Setup checklist">
           {checklist.isLoading ? (
-            <Loader2 className="mx-auto h-5 w-5 animate-spin text-[#405189]" />
+            <Spinner />
           ) : (
             <ul className="space-y-2">
               {checklist.data?.steps.map((s) => (
                 <li key={s.step} className="flex items-center gap-2 text-sm">
-                  {s.done ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Circle className="h-4 w-4 text-slate-300" />}
-                  <span className={s.done ? "text-slate-700" : "text-slate-500"}>{STEP_LABELS[s.step] ?? s.step}</span>
-                  {!s.required && <span className="text-xs text-slate-400">optional</span>}
+                  {s.done ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Circle className="h-4 w-4 text-gray-300" />}
+                  <span className={s.done ? "text-gray-700" : "text-gray-500"}>{STEP_LABELS[s.step] ?? s.step}</span>
+                  {!s.required && <span className="text-xs text-gray-400">optional</span>}
                 </li>
               ))}
             </ul>
@@ -218,34 +247,36 @@ function OrganizationDetail({ id, onBack }: { id: string; onBack: () => void }) 
         </Panel>
       </div>
 
+      {!o.ownerUserId && <OwnerInvitePanel org={o} />}
+
       <div className="grid gap-6 lg:grid-cols-3">
         <StatusActions org={o} />
         <PlanEditor key={`plan-${o.id}-${o.planTier}-${o.seatLimit}`} org={o} />
         <Panel title="Usage this month">
           {usage.isLoading ? (
-            <Loader2 className="mx-auto h-5 w-5 animate-spin text-[#405189]" />
+            <Spinner />
           ) : (
             <ul className="space-y-3">
               {usage.data?.limits.map((l) => {
                 const pct = l.max ? Math.min(100, Math.round((l.current / l.max) * 100)) : 0;
                 return (
                   <li key={l.limit} className="text-sm">
-                    <div className="flex justify-between text-slate-600">
+                    <div className="flex justify-between text-gray-600">
                       <span>{LIMIT_LABELS[l.limit] ?? l.limit}</span>
-                      <span className="font-medium text-slate-800">
+                      <span className="font-medium text-gray-800">
                         {l.current} / {l.max ?? "∞"}
                       </span>
                     </div>
                     {l.max !== null && (
-                      <div className="mt-1 h-1.5 rounded-full bg-slate-100">
-                        <div className={`h-1.5 rounded-full ${pct >= 100 ? "bg-[#f06548]" : "bg-[#405189]"}`} style={{ width: `${pct}%` }} />
+                      <div className="mt-1 h-1.5 rounded-full bg-gray-100">
+                        <div className={`h-1.5 rounded-full ${pct >= 100 ? "bg-red-600" : "bg-[#2016a9]"}`} style={{ width: `${pct}%` }} />
                       </div>
                     )}
                   </li>
                 );
               })}
               {usage.data && !usage.data.enforced && (
-                <li className="text-xs text-slate-400">Limits are tracked but not enforced yet.</li>
+                <li className="text-xs text-gray-400">Limits are tracked but not enforced yet.</li>
               )}
             </ul>
           )}
@@ -254,6 +285,54 @@ function OrganizationDetail({ id, onBack }: { id: string; onBack: () => void }) 
 
       <EmailPolicyEditor key={`policy-${o.id}-${o.primaryDomain}-${o.allowedDomains.join()}-${o.allowedEmails.join()}`} org={o} />
     </div>
+  );
+}
+
+// Until the owner accepts, nobody can log in to the company; let platform
+// admins see where the invite stands and send a fresh link
+function OwnerInvitePanel({ org }: { org: OrganizationRecord }) {
+  const invite = useOwnerInvite(org.id, true);
+  const resend = useResendOwnerInvite();
+  const expired = invite.data?.status === "expired";
+
+  return (
+    <Panel
+      title="Owner hasn't joined yet"
+      description="Nobody can sign in to this company until the owner accepts their invitation."
+      className={expired ? "border-amber-300" : ""}
+    >
+      {invite.isLoading ? (
+        <Spinner />
+      ) : invite.data ? (
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <dl className="grid flex-1 gap-5 sm:grid-cols-3">
+            <Detail label="Sent to">{invite.data.email}</Detail>
+            <Detail label="Status">
+              <StatusBadge status={invite.data.status} label={invite.data.status === "pending" ? "Waiting" : undefined} />
+            </Detail>
+            <Detail label={expired ? "Expired" : "Expires"}>{formatDate(invite.data.expiresAt)}</Detail>
+          </dl>
+          <button
+            className={expired ? primaryButton : secondaryButton}
+            disabled={resend.isPending}
+            onClick={() =>
+              resend.mutate(
+                { id: org.id },
+                {
+                  onSuccess: () => toast.success(`New invitation sent to ${invite.data?.email}`),
+                  onError: (e) => toast.error(e.message),
+                }
+              )
+            }
+          >
+            {resend.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Resend invitation
+          </button>
+        </div>
+      ) : (
+        <p className="text-sm text-gray-500">No owner invitation found for this company.</p>
+      )}
+    </Panel>
   );
 }
 
@@ -282,7 +361,7 @@ function StatusActions({ org }: { org: OrganizationRecord }) {
   return (
     <Panel title="Status">
       {org.status === OrgStatus.SUSPENDED ? (
-        <div className="space-y-3 text-sm text-slate-600">
+        <div className="space-y-3 text-sm text-gray-600">
           <p>Members can&apos;t log in while the organization is suspended. Their data is kept.</p>
           <button className={primaryButton} onClick={onActivate} disabled={activate.isPending}>
             {activate.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -290,7 +369,7 @@ function StatusActions({ org }: { org: OrganizationRecord }) {
           </button>
         </div>
       ) : (
-        <div className="space-y-3 text-sm text-slate-600">
+        <div className="space-y-3 text-sm text-gray-600">
           {org.status === OrgStatus.PENDING_SETUP && (
             <div className="space-y-2">
               <p>The organization is still setting up. You can activate it now without waiting for the checklist.</p>
@@ -301,7 +380,7 @@ function StatusActions({ org }: { org: OrganizationRecord }) {
             </div>
           )}
           <label className="block">
-            <span className="mb-1 block font-medium text-slate-700">Suspension reason</span>
+            <span className={labelClass}>Suspension reason</span>
             <input className={inputClass} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Unpaid invoice" />
           </label>
           <button className={dangerButton} onClick={onSuspend} disabled={suspend.isPending}>
@@ -329,7 +408,7 @@ function PlanEditor({ org }: { org: OrganizationRecord }) {
     <Panel title="Plan">
       <div className="space-y-3 text-sm">
         <label className="block">
-          <span className="mb-1 block font-medium text-slate-700">Plan tier</span>
+          <span className={labelClass}>Plan tier</span>
           <select className={inputClass} value={planTier} onChange={(e) => setPlanTier(e.target.value as PlanTier)}>
             {Object.values(PlanTier).map((p) => (
               <option key={p} value={p}>
@@ -339,7 +418,7 @@ function PlanEditor({ org }: { org: OrganizationRecord }) {
           </select>
         </label>
         <label className="block">
-          <span className="mb-1 block font-medium text-slate-700">Seat limit override</span>
+          <span className={labelClass}>Seat limit override</span>
           <input className={inputClass} inputMode="numeric" placeholder="Plan default" value={seatLimit} onChange={(e) => setSeatLimit(e.target.value.replace(/\D/g, ""))} />
         </label>
         <button className={primaryButton} onClick={onSave} disabled={update.isPending}>
@@ -376,21 +455,21 @@ function EmailPolicyEditor({ org }: { org: OrganizationRecord }) {
 
   return (
     <Panel title="Who can be invited">
-      <p className="mb-4 text-sm text-slate-500">
+      <p className="mb-4 text-sm text-gray-500">
         When a domain is set, invites must go to that domain (or a subdomain). Extra addresses can be allowed individually.
         With no domain, any address can be invited one by one.
       </p>
       <div className="grid gap-4 md:grid-cols-3">
         <label className="text-sm">
-          <span className="mb-1 block font-medium text-slate-700">Primary domain</span>
+          <span className={labelClass}>Primary domain</span>
           <input className={inputClass} value={primaryDomain} onChange={(e) => setPrimaryDomain(e.target.value)} placeholder="acme.com" />
         </label>
         <label className="text-sm">
-          <span className="mb-1 block font-medium text-slate-700">Extra domains (one per line)</span>
+          <span className={labelClass}>Extra domains (one per line)</span>
           <textarea className={`${inputClass} resize-y`} rows={3} value={allowedDomains} onChange={(e) => setAllowedDomains(e.target.value)} placeholder="acme.co.uk" />
         </label>
         <label className="text-sm">
-          <span className="mb-1 block font-medium text-slate-700">Allowed addresses (one per line)</span>
+          <span className={labelClass}>Allowed addresses (one per line)</span>
           <textarea className={`${inputClass} resize-y`} rows={3} value={allowedEmails} onChange={(e) => setAllowedEmails(e.target.value)} placeholder="contractor@gmail.com" />
         </label>
       </div>
@@ -406,8 +485,8 @@ function EmailPolicyEditor({ org }: { org: OrganizationRecord }) {
 
 export default function OrganizationsPage() {
   return (
-    <PlatformShell title="Companies" description="Companies on the platform and requests from companies that want to join.">
-      <Suspense fallback={<Loader2 className="mx-auto h-6 w-6 animate-spin text-[#405189]" />}>
+    <PlatformShell title="Companies" description="Companies on the platform, requests to join, and requests to change email domains.">
+      <Suspense fallback={<Spinner />}>
         <CompaniesView />
       </Suspense>
     </PlatformShell>

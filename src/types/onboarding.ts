@@ -164,6 +164,7 @@ export interface OrganizationRecord {
 	suspendedAt: string | null;
 	suspensionReason: string | null;
 	createdAt: string;
+	updatedAt: string;
 }
 
 export interface OnboardingChecklist {
@@ -195,4 +196,111 @@ export interface InviteLookup {
 	isOwner: boolean;
 	expiresAt: string;
 	existingAccount: boolean;
+}
+
+export enum JobFunction {
+	GENERAL = 'general',
+	FINANCE = 'finance',
+	IT = 'it',
+	HR = 'hr',
+	EXECUTIVE = 'executive',
+	OPERATIONS = 'operations',
+	SALES = 'sales',
+	OTHER = 'other'
+}
+
+export const JOB_FUNCTION_LABELS: Record<JobFunction, string> = {
+	[JobFunction.GENERAL]: 'General',
+	[JobFunction.FINANCE]: 'Finance',
+	[JobFunction.IT]: 'IT',
+	[JobFunction.HR]: 'HR',
+	[JobFunction.EXECUTIVE]: 'Executive',
+	[JobFunction.OPERATIONS]: 'Operations',
+	[JobFunction.SALES]: 'Sales',
+	[JobFunction.OTHER]: 'Other'
+};
+
+export interface Member {
+	id: string;
+	firstName: string;
+	lastName: string;
+	email: string;
+	status: 'active' | 'suspended' | 'pending';
+	jobFunction: JobFunction | null;
+	role: { id: string; name: string } | null;
+	department: { id: string; name: string } | null;
+	createdAt: string;
+}
+
+export interface Department {
+	id: string;
+	name: string;
+	managerUserId: string | null;
+	memberCount: number;
+	createdAt: string;
+}
+
+export interface Invite {
+	id: string;
+	email: string;
+	firstName: string | null;
+	lastName: string | null;
+	roleId: string;
+	departmentId: string | null;
+	jobFunction: JobFunction | null;
+	status: 'pending' | 'accepted' | 'expired' | 'revoked';
+	isOwner: boolean;
+	batchId: string | null;
+	expiresAt: string;
+	acceptedAt: string | null;
+	createdAt: string;
+}
+
+export interface BulkInviteResult {
+	batchId: string;
+	created: number;
+	skipped: { row: number; email: string; reason: string }[];
+}
+
+export interface RoleSummary {
+	id: string;
+	name: string;
+	isCustom: boolean;
+}
+
+export interface DomainChangeRequest {
+	id: string;
+	organizationId: string;
+	requestedBy: string;
+	requester: { id: string; name: string; email: string } | null;
+	currentPrimaryDomain: string | null;
+	currentAllowedDomains: string[];
+	proposedPrimaryDomain: string | null;
+	proposedAllowedDomains: string[];
+	reason: string;
+	status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+	reviewedAt: string | null;
+	reviewNote: string | null;
+	createdAt: string;
+}
+
+// Platform admin view adds the company and anything that would block approval
+export interface DomainChangeRequestReview extends DomainChangeRequest {
+	organizationName: string | null;
+	currentNow: { primaryDomain: string | null; allowedDomains: string[] } | null;
+	conflicts: { domain: string; organizationId: string; organizationName: string }[];
+}
+
+export interface PersonalAccount {
+	id: string;
+	firstName: string;
+	lastName: string;
+	email: string;
+	status: 'active' | 'pending' | 'suspended';
+	createdAt: string;
+	lastLoginAt: string | null;
+}
+
+export interface PersonalAccountDetail extends PersonalAccount {
+	activity: { id: string; category: string; action: string; occurredAt: string; resourceType: string | null }[];
 }

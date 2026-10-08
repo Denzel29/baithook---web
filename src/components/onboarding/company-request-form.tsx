@@ -310,8 +310,10 @@ export const CompanyRequestForm = () => {
                           <option value="" disabled>
                             Select…
                           </option>
+                          {/* Names come from the runtime's locale data, which differs slightly
+                              between Node (static render) and browsers; the browser's wins */}
                           {countries.map((c) => (
-                            <option key={c.code} value={c.code}>
+                            <option key={c.code} value={c.code} suppressHydrationWarning>
                               {c.name}
                             </option>
                           ))}

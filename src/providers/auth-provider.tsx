@@ -1,6 +1,8 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
+import { toast } from "sonner";
+import { ApiError, apiRequest, SESSION_EXPIRED_EVENT } from "@/lib/api";
 import type { AuthUser, LoginResponse } from "@/types/shared";
 
 const TOKEN_KEY = "phishguard_token";
@@ -59,6 +61,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
   }, []);
+
+  // The stored user can be stale: an admin may have changed this person's role
+  // or moved them into an organization since they logged in. Refresh it once
+  // per session so routing and role checks use current data.
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    apiRequest<AuthUser>("/auth/me", { token })
+      .then((fresh) => {
+        if (cancelled) return;
+        setUser(fresh);
+        localStorage.setItem(USER_KEY, JSON.stringify(fresh));
+      })
+      .catch((error) => {
+        // 401 is handled by the session-expired listener; a 403 here means the
+        // account or organization was suspended
+        if (!cancelled && error instanceof ApiError && error.status === 403) {
+          toast.error(error.message);
+          logout();
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, logout]);
+
+  // Any request rejected as unauthenticated ends the local session; dashboard
+  // guards then send the user to /login
+  useEffect(() => {
+    const onExpired = () => {
+      if (!localStorage.getItem(TOKEN_KEY)) return;
+      toast.error("Your session has ended. Please log in again.");
+      logout();
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
+  }, [logout]);
 
   return (
     <AuthContext.Provider

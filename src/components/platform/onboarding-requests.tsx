@@ -3,10 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, ArrowLeft, Check, Loader2, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, Inbox, Loader2, MousePointerClick, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   Detail,
+  EmptyState,
   FilterTabs,
   Panel,
   StatusBadge,
@@ -14,8 +15,10 @@ import {
   dangerButton,
   formatDate,
   inputClass,
+  labelClass,
   primaryButton,
   secondaryButton,
+  Spinner,
 } from "@/components/platform/platform-shell";
 import { useApproveRequest, useOnboardingRequest, useOnboardingRequests, useRejectRequest } from "@/lib/hooks/use-platform";
 import {
@@ -56,27 +59,31 @@ export function OnboardingRequestsTab() {
         <FilterTabs value={filter} options={FILTERS} onChange={setFilter} />
         <Panel>
           {requests.isLoading ? (
-            <Loader2 className="mx-auto h-6 w-6 animate-spin text-[#405189]" />
+            <Spinner />
           ) : requests.isError ? (
             <p className="text-sm text-red-600">{(requests.error as Error).message}</p>
           ) : !requests.data?.data.length ? (
-            <p className="py-6 text-center text-sm text-slate-500">No requests here.</p>
+            <EmptyState icon={Inbox} title="Nothing here">
+              {filter === OnboardingRequestStatus.PENDING
+                ? "No companies are waiting for review. New requests appear here once the contact verifies their email."
+                : "No requests with this status."}
+            </EmptyState>
           ) : (
-            <ul className="-my-2 divide-y divide-slate-100">
+            <ul className="-my-2 divide-y divide-gray-100">
               {requests.data.data.map((r) => (
                 <li key={r.id}>
                   <button
                     onClick={() => select(r.id)}
-                    className={`flex w-full items-start justify-between gap-3 rounded-md px-2 py-3 text-left transition hover:bg-slate-50 ${
-                      r.id === selectedId ? "bg-[#405189]/5" : ""
+                    className={`flex w-full items-start justify-between gap-3 rounded-md px-2 py-3 text-left transition hover:bg-gray-50 ${
+                      r.id === selectedId ? "bg-indigo-50/60" : ""
                     }`}
                   >
                     <div className="min-w-0">
-                      <p className="truncate font-medium text-slate-800">{r.companyName}</p>
-                      <p className="truncate text-xs text-slate-500">
+                      <p className="truncate font-medium text-gray-800">{r.companyName}</p>
+                      <p className="truncate text-xs text-gray-500">
                         {r.contactFirstName} {r.contactLastName} · {r.contactEmail}
                       </p>
-                      <p className="mt-1 text-xs text-slate-400">{formatDate(r.createdAt)}</p>
+                      <p className="mt-1 text-xs text-gray-400">{formatDate(r.createdAt)}</p>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
                       <StatusBadge status={r.status} />
@@ -97,7 +104,9 @@ export function OnboardingRequestsTab() {
           <RequestDetail id={selectedId} onBack={() => select(null)} />
         ) : (
           <Panel>
-            <p className="py-10 text-center text-sm text-slate-500">Select a request to review it.</p>
+            <EmptyState icon={MousePointerClick} title="Select a request">
+              Pick a company on the left to see its details and approve or reject it.
+            </EmptyState>
           </Panel>
         )}
       </div>
@@ -111,7 +120,7 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
   if (request.isLoading) {
     return (
       <Panel>
-        <Loader2 className="mx-auto h-6 w-6 animate-spin text-[#405189]" />
+        <Spinner />
       </Panel>
     );
   }
@@ -134,7 +143,7 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
 
   return (
     <div className="space-y-4">
-      <button onClick={onBack} className="flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900 lg:hidden">
+      <button onClick={onBack} className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 lg:hidden">
         <ArrowLeft className="h-4 w-4" /> Back to requests
       </button>
 
@@ -160,7 +169,7 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
           <Detail label="Timezone">{r.timezone}</Detail>
           <Detail label="Website">
             {r.website ? (
-              <a href={r.website.startsWith("http") ? r.website : `https://${r.website}`} target="_blank" rel="noopener noreferrer" className="text-[#405189] hover:underline">
+              <a href={r.website.startsWith("http") ? r.website : `https://${r.website}`} target="_blank" rel="noopener noreferrer" className="text-[#2016a9] hover:underline">
                 {r.website}
               </a>
             ) : null}
@@ -170,7 +179,7 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
           <Detail label="Plan interest">{r.interestedPlan ? PLAN_LABELS[r.interestedPlan] : null}</Detail>
         </dl>
 
-        <hr className="my-5 border-slate-100" />
+        <hr className="my-5 border-gray-100" />
 
         <dl className="grid gap-4 sm:grid-cols-2">
           <Detail label="Contact">
@@ -189,15 +198,15 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
         </dl>
 
         {r.message && (
-          <div className="mt-5 rounded-md bg-slate-50 p-3 text-sm whitespace-pre-wrap text-slate-700">{r.message}</div>
+          <div className="mt-5 rounded-md bg-gray-50 p-3 text-sm whitespace-pre-wrap text-gray-700">{r.message}</div>
         )}
 
         {r.reviewedAt && (
-          <div className="mt-5 text-sm text-slate-600">
+          <div className="mt-5 text-sm text-gray-600">
             Reviewed {formatDate(r.reviewedAt)}
             {r.reviewNote && <p className="mt-1 italic">&ldquo;{r.reviewNote}&rdquo;</p>}
             {r.organizationId && (
-              <Link href={`/dashboard/platform/organizations?id=${r.organizationId}`} className="mt-2 block w-fit font-medium text-[#405189] hover:underline">
+              <Link href={`/dashboard/platform/organizations?id=${r.organizationId}`} className="mt-2 block w-fit font-medium text-[#2016a9] hover:underline">
                 Open organization →
               </Link>
             )}
@@ -209,7 +218,7 @@ function RequestDetail({ id, onBack }: { id: string; onBack: () => void }) {
       {r.status === OnboardingRequestStatus.PENDING && <ReviewActions key={r.id} request={r} />}
       {r.status === OnboardingRequestStatus.UNVERIFIED && (
         <Panel>
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-gray-600">
             Waiting for the contact to verify their email. Requests can only be reviewed once verified.
           </p>
         </Panel>
@@ -271,7 +280,7 @@ function ReviewActions({ request }: { request: OnboardingRequestDetail }) {
       {mode === "approve" && (
         <div className="grid gap-4 sm:grid-cols-3">
           <label className="text-sm">
-            <span className="mb-1 block font-medium text-slate-700">Plan</span>
+            <span className={labelClass}>Plan</span>
             <select className={inputClass} value={planTier} onChange={(e) => setPlanTier(e.target.value as PlanTier)} disabled={busy}>
               {Object.values(PlanTier).map((p) => (
                 <option key={p} value={p}>
@@ -281,18 +290,18 @@ function ReviewActions({ request }: { request: OnboardingRequestDetail }) {
             </select>
           </label>
           <label className="text-sm">
-            <span className="mb-1 block font-medium text-slate-700">Seat limit</span>
+            <span className={labelClass}>Seat limit</span>
             <input className={inputClass} inputMode="numeric" placeholder="Plan default" value={seatLimit} onChange={(e) => setSeatLimit(e.target.value.replace(/\D/g, ""))} disabled={busy} />
           </label>
           <label className="text-sm">
-            <span className="mb-1 block font-medium text-slate-700">Company domain</span>
+            <span className={labelClass}>Company domain</span>
             <input className={inputClass} placeholder="none (per-address invites)" value={primaryDomain} onChange={(e) => setPrimaryDomain(e.target.value)} disabled={busy} />
           </label>
         </div>
       )}
 
       <label className="mt-4 block text-sm">
-        <span className="mb-1 block font-medium text-slate-700">
+        <span className={labelClass}>
           {mode === "approve" ? "Note to the requester (optional)" : "Reason (emailed to the requester)"}
         </span>
         <textarea className={`${inputClass} resize-y`} rows={3} value={note} onChange={(e) => setNote(e.target.value)} disabled={busy} maxLength={1000} />
