@@ -1,7 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
-import { BarChart3, Building2, LineChart, Users } from "lucide-react";
+import { BarChart3, Building2, LineChart, Megaphone, Users } from "lucide-react";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { getDashboardRoute, useAuth } from "@/providers/auth-provider";
 import { useDomainRequests, useOnboardingRequests } from "@/lib/hooks/use-platform";
@@ -29,6 +29,7 @@ export function PlatformShell(props: { title: ReactNode; description?: ReactNode
         { href: "/dashboard/platform", label: "Overview", icon: BarChart3 },
         { href: "/dashboard/platform/organizations", label: "Companies", icon: Building2, badge: pendingCompanies + pendingDomains },
         { href: "/dashboard/platform/users", label: "Users", icon: Users },
+        { href: "/dashboard/platform/campaigns", label: "Campaigns", icon: Megaphone },
         { href: "/dashboard/platform/analytics", label: "Analytics", icon: LineChart },
       ]}
       canAccess={isPlatformAdmin}
